@@ -1,0 +1,45 @@
+#/bin/bash
+
+from machine import UART, Pin
+
+# Initial Ping
+ping -4 -c 1 -w 1 192.168.0.90>/dev/null
+retcode=$?
+
+
+ping_data_for_5_minutes = []
+ping_server = 8.8.8.8
+Destination_address = 192.168.0.0
+
+
+
+while True:
+	while number_of_pings < 20: # sends every 10 minutes
+	ping_response = $(ping -c 1 -i 29 -w 1 $ping_server)
+	echo $ping_response
+	ping_data_for_5_minutes.append(ping_response)
+	# sleep for some number of seconds (now 15)
+	# sleep 15
+	numbrer_of_pings += 1
+
+	# send data to server
+	uart1 = UART(1, baudrate=115200, tx=Pin(4), rx=Pin(5))
+	uart1.write(ping_data_for_5_minutes)
+	
+
+
+
+
+### ------- MAKE SURE TO HAVE IT DO THIS CONTINUALLY SO IT PERSISTS PAST DROP ------- ###
+# below while runs until ping returns non-zero (error)
+
+while [ $retcode -eq 0 ] ; do
+	ping -4 -c 1 -w 1 192.168.0.90>/dev/null
+	retcode=$? # Returns if there was a 0 (success) or 1 (failure)
+	echo ping ok
+	
+done
+
+
+
+
