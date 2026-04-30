@@ -34,7 +34,7 @@ const categoryColors = {
 };
 
 const corner1 = L.latLng(41.596, -93.662); // Bottom-left
-const corner2 = L.latLng(41.607, -93.645); // Top-right
+const corner2 = L.latLng(41.608, -93.645); // Top-right
 const campusBounds = L.latLngBounds(corner1, corner2);
  
 function makeIcon(color) {
