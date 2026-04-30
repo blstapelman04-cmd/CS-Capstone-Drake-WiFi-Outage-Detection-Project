@@ -4,6 +4,9 @@ import L from "leaflet";
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
+import "leaflet.markercluster";
+import "leaflet.markercluster/dist/MarkerCluster.css";
+import "leaflet.markercluster/dist/MarkerCluster.Default.css";
  
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -62,10 +65,13 @@ function App() {
     }).addTo(map);
  
     const layers = {
-      academic: L.layerGroup().addTo(map),
-      athletics: L.layerGroup().addTo(map),
-      "student life": L.layerGroup().addTo(map),
+      academic: L.markerClusterGroup({ zoomToBoundsOnClick: false, spiderfyOnMaxZoom: true, maxClusterRadius: 40 }),
+      athletics: L.markerClusterGroup({ zoomToBoundsOnClick: false, spiderfyOnMaxZoom: true, maxClusterRadius: 40 }),
+      "student life": L.markerClusterGroup({ zoomToBoundsOnClick: false, spiderfyOnMaxZoom: true, maxClusterRadius: 40 }),
     };
+
+    // Add them to map
+    Object.values(layers).forEach(layer => map.addLayer(layer));
  
     buildings.forEach((b) => {
       const color = categoryColors[b.category];
