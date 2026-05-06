@@ -235,6 +235,8 @@ async function fetchLocations() {
 const GLOBAL_STYLES = `
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   html, body, #root { height: 100%; width: 100%; overflow: hidden; }
+  html { height: -webkit-fill-available; }
+  body { min-height: -webkit-fill-available; }
 `;
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -244,6 +246,7 @@ export default function App() {
   const mapInstanceRef = useRef(null);
   const tileLayerRef   = useRef(null);
   const markersRef     = useRef({});
+  const panelRef       = useRef(null); // tracks bottom panel for invalidateSize
 
   const [isDark,     setIsDark]     = useState(() => {
     const saved = localStorage.getItem('drakeMapDarkMode');
@@ -269,6 +272,16 @@ export default function App() {
     document.head.appendChild(style);
     return () => document.head.removeChild(style);
   }, []);
+
+  // When panel height changes on mobile, tell Leaflet to recalculate the map size
+  // so the visible map area matches the actual rendered area
+  useEffect(() => {
+    if (!mapInstanceRef.current) return;
+    const timer = setTimeout(() => {
+      mapInstanceRef.current.invalidateSize({ animate: false });
+    }, 320); // slightly after the CSS transition finishes (300ms)
+    return () => clearTimeout(timer);
+  }, [selected, isMobile]);
 
   // Track mobile breakpoint
   useEffect(() => {
@@ -390,11 +403,10 @@ export default function App() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', fontFamily: "'DM Mono', 'Courier New', monospace", background: t.bg, color: t.textPrimary, overflow: 'hidden', transition: 'background 0.25s, color 0.25s' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100svh', fontFamily: "'DM Mono', 'Courier New', monospace", background: t.bg, color: t.textPrimary, overflow: 'hidden', transition: 'background 0.25s, color 0.25s' }}>
 
       {/* ── Top bar ── */}
       {isMobile ? (
-        // Mobile top bar: title row + pills row
         <div style={{ background: t.bg, borderBottom: `1px solid ${t.border}`, flexShrink: 0, padding: '8px 12px', transition: 'background 0.25s' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
             <div>
@@ -428,7 +440,6 @@ export default function App() {
           {error   && <span style={{ fontSize: 11, color: STATUS_COLOR.offline }}>⚠ {error}</span>}
         </div>
       ) : (
-        // Desktop top bar: single row
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 20px', background: t.bg, borderBottom: `1px solid ${t.border}`, flexShrink: 0, transition: 'background 0.25s' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <div>
@@ -468,7 +479,7 @@ export default function App() {
       <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', flex: 1, overflow: 'hidden' }}>
 
         {/* Map */}
-        <div style={{ flex: 1, position: 'relative', minHeight: isMobile ? 0 : undefined }}>
+        <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
           <div
             ref={mapRef}
             style={{
@@ -480,114 +491,144 @@ export default function App() {
         </div>
 
         {/* ── Side/bottom panel ── */}
-        <div style={{
-          // Desktop: fixed-width right column. Mobile: fixed-height bottom drawer.
-          ...(isMobile
-            ? { width: '100%', height: selected ? '55vh' : '42vw', maxHeight: '60vh', flexDirection: 'column', borderTop: `1px solid ${t.border}`, borderLeft: 'none', transition: 'height 0.3s ease' }
-            : { width: 260, flexDirection: 'column', borderLeft: `1px solid ${t.border}` }
-          ),
-          display: 'flex',
-          background: t.bgPanel,
-          overflow: 'hidden',
-          flexShrink: 0,
-          transition: 'background 0.25s, height 0.3s ease',
-        }}>
+        <div
+          ref={panelRef}
+          style={{
+            ...(isMobile
+              ? {
+                  width: '100%',
+                  // Collapsed: show ~4 list items. Expanded: show detail + list.
+                  height: selected ? '52vh' : '38vw',
+                  maxHeight: '65vh',
+                  flexDirection: 'column',
+                  borderTop: `1px solid ${t.border}`,
+                  borderLeft: 'none',
+                  // Safe area inset for Safari home bar
+                  paddingBottom: 'env(safe-area-inset-bottom)',
+                }
+              : { width: 260, flexDirection: 'column', borderLeft: `1px solid ${t.border}` }
+            ),
+            display: 'flex',
+            background: t.bgPanel,
+            overflow: 'hidden',
+            flexShrink: 0,
+            transition: 'background 0.25s, height 0.3s ease',
+          }}
+        >
+          {/* Detail box — only shown when something is selected */}
+          {selectedLoc && (
+            <div style={{ padding: isMobile ? '10px 14px' : '14px 16px', borderBottom: `1px solid ${t.border}`, flexShrink: 0, overflowY: 'auto', maxHeight: isMobile ? '30vh' : '55vh' }}>
+              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.18em', color: t.textMuted, textTransform: 'uppercase', marginBottom: 8 }}>
+                Location Detail
+              </div>
 
-          {/* Detail box */}
-          <div style={{ padding: '14px 16px', borderBottom: `1px solid ${t.border}`, flexShrink: 0, overflowY: 'auto', maxHeight: isMobile ? '40vh' : '55vh' }}>
-            <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.18em', color: t.textMuted, textTransform: 'uppercase', marginBottom: 10 }}>
-              Location Detail
-            </div>
-            {selectedLoc ? (
-              <>
-                <div style={{ fontSize: 13, fontWeight: 700, color: t.textPrimary, marginBottom: 4, letterSpacing: '0.04em' }}>
-                  {selectedLoc.name}
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', borderBottom: `1px solid ${t.borderSubtle}`, marginBottom: 10 }}>
-                  <span style={{ fontSize: 11, color: t.textMuted, letterSpacing: '0.05em' }}>Status</span>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: STATUS_COLOR[selectedLoc.status] }}>
-                    {selectedLoc.status}
+              <div style={{ fontSize: 13, fontWeight: 700, color: t.textPrimary, marginBottom: 4, letterSpacing: '0.04em' }}>
+                {selectedLoc.name}
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderBottom: `1px solid ${t.borderSubtle}`, marginBottom: 8 }}>
+                <span style={{ fontSize: 11, color: t.textMuted }}>Status</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: STATUS_COLOR[selectedLoc.status] }}>{selectedLoc.status}</span>
+              </div>
+
+              {selectedLoc.isStale && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px', marginBottom: 8, borderRadius: 3, background: STATUS_COLOR.unknown + '18', border: `1px solid ${STATUS_COLOR.unknown}44` }}>
+                  <span style={{ fontSize: 12 }}>⚠</span>
+                  <span style={{ fontSize: 11, color: STATUS_COLOR.unknown, fontWeight: 700 }}>
+                    {selectedLoc.neverReported ? 'No reports in the past 7 days' : `Last report ${selectedLoc.staleLabel} — wifi status unknown`}
                   </span>
                 </div>
+              )}
 
-                {selectedLoc.isStale && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px', marginBottom: 10, borderRadius: 3, background: STATUS_COLOR.unknown + '18', border: `1px solid ${STATUS_COLOR.unknown}44` }}>
-                    <span style={{ fontSize: 13 }}>⚠</span>
-                    <span style={{ fontSize: 11, color: STATUS_COLOR.unknown, fontWeight: 700 }}>
-                      {selectedLoc.neverReported
-                        ? 'No reports in the past 7 days'
-                        : `Last report ${selectedLoc.staleLabel} — wifi status unknown`}
-                    </span>
-                  </div>
-                )}
-
-                {NETWORKS.map(({ label, pctKey, avgKey }) => {
-                  const pct   = selectedLoc.avgUptime?.[pctKey] ?? null;
-                  const avgMs = selectedLoc.avgPing?.[avgKey]   ?? null;
-                  return (
-                    <div key={label} style={{ marginBottom: 10 }}>
-                      <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.14em', color: t.textMuted, textTransform: 'uppercase', marginBottom: 4, paddingBottom: 3, borderBottom: `1px solid ${t.border}` }}>
-                        {label}
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderBottom: `1px solid ${t.borderSubtle}` }}>
-                        <span style={{ fontSize: 11, color: t.textMuted, letterSpacing: '0.05em' }}>Uptime (6h)</span>
+              {/* Network rows — compact (one line) on mobile, two rows on desktop */}
+              {NETWORKS.map(({ label, pctKey, avgKey }) => {
+                const pct   = selectedLoc.avgUptime?.[pctKey] ?? null;
+                const avgMs = selectedLoc.avgPing?.[avgKey]   ?? null;
+                return (
+                  <div key={label} style={{ marginBottom: isMobile ? 5 : 10 }}>
+                    <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.14em', color: t.textMuted, textTransform: 'uppercase', marginBottom: 3, paddingBottom: 2, borderBottom: `1px solid ${t.border}` }}>
+                      {label}
+                    </div>
+                    {isMobile ? (
+                      // Compact: uptime and ping on one line
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 0' }}>
+                        <span style={{ fontSize: 11, color: t.textMuted }}>Uptime</span>
                         <span style={{ fontSize: 12, fontWeight: 700, color: valColor(pctClass(pct)) || t.textPrimary }}>
                           {pct != null ? pct.toFixed(1) + '%' : '—'}
                         </span>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderBottom: `1px solid ${t.borderSubtle}` }}>
-                        <span style={{ fontSize: 11, color: t.textMuted, letterSpacing: '0.05em' }}>Avg Ping (6h)</span>
+                        <span style={{ fontSize: 11, color: t.textMuted, marginLeft: 10 }}>Ping</span>
                         <span style={{ fontSize: 12, fontWeight: 700, color: valColor(pingClass(avgMs)) || t.textPrimary }}>
                           {avgMs != null ? avgMs.toFixed(0) + ' ms' : '—'}
                         </span>
                       </div>
-                    </div>
-                  );
-                })}
-
-                {(() => {
-                  const ts = formatTimestamp(selectedLoc.lastReportTs);
-                  return (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '5px 0', marginTop: 2 }}>
-                      <span style={{ fontSize: 11, color: t.textMuted, letterSpacing: '0.05em' }}>Last Report</span>
-                      {ts ? (
-                        <div style={{ textAlign: 'right' }}>
-                          <div style={{ fontSize: 11, color: t.textMuted, fontVariantNumeric: 'tabular-nums' }}>{ts.date}</div>
-                          <div style={{ fontSize: 11, color: t.textMuted, fontVariantNumeric: 'tabular-nums' }}>{ts.time}</div>
+                    ) : (
+                      <>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderBottom: `1px solid ${t.borderSubtle}` }}>
+                          <span style={{ fontSize: 11, color: t.textMuted }}>Uptime (6h)</span>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: valColor(pctClass(pct)) || t.textPrimary }}>{pct != null ? pct.toFixed(1) + '%' : '—'}</span>
                         </div>
-                      ) : (
-                        <span style={{ fontSize: 11, color: STATUS_COLOR.unknown }}>No reports (7 days)</span>
-                      )}
-                    </div>
-                  );
-                })()}
-              </>
-            ) : (
-              <div style={{ fontSize: 12, color: t.textEmpty, lineHeight: 1.7, marginTop: 4 }}>
-                {isMobile ? 'Tap a marker to see details.' : 'Select a marker on the map or a location in the list below.'}
-              </div>
-            )}
-          </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderBottom: `1px solid ${t.borderSubtle}` }}>
+                          <span style={{ fontSize: 11, color: t.textMuted }}>Avg Ping (6h)</span>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: valColor(pingClass(avgMs)) || t.textPrimary }}>{avgMs != null ? avgMs.toFixed(0) + ' ms' : '—'}</span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+
+              {!isMobile && (() => {
+                const ts = formatTimestamp(selectedLoc.lastReportTs);
+                return (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '5px 0', marginTop: 2 }}>
+                    <span style={{ fontSize: 11, color: t.textMuted }}>Last Report</span>
+                    {ts ? (
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: 11, color: t.textMuted }}>{ts.date}</div>
+                        <div style={{ fontSize: 11, color: t.textMuted }}>{ts.time}</div>
+                      </div>
+                    ) : (
+                      <span style={{ fontSize: 11, color: STATUS_COLOR.unknown }}>No reports (7 days)</span>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
+          {/* Empty state hint when nothing selected — mobile only */}
+          {!selectedLoc && isMobile && (
+            <div style={{ padding: '10px 14px', borderBottom: `1px solid ${t.border}`, flexShrink: 0 }}>
+              <div style={{ fontSize: 12, color: t.textEmpty, lineHeight: 1.6 }}>Tap a marker or location to see details.</div>
+            </div>
+          )}
+
+          {/* Empty state — desktop */}
+          {!selectedLoc && !isMobile && (
+            <div style={{ padding: '14px 16px', borderBottom: `1px solid ${t.border}`, flexShrink: 0 }}>
+              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.18em', color: t.textMuted, textTransform: 'uppercase', marginBottom: 10 }}>Location Detail</div>
+              <div style={{ fontSize: 12, color: t.textEmpty, lineHeight: 1.7 }}>Select a marker on the map or a location in the list below.</div>
+            </div>
+          )}
 
           {/* Filter tabs */}
-          <div style={{ display: 'flex', gap: 5, padding: '8px 12px', borderBottom: `1px solid ${t.border}`, background: t.bg, flexShrink: 0, flexWrap: 'wrap', transition: 'background 0.25s' }}>
+          <div style={{ display: 'flex', gap: 5, padding: '6px 12px', borderBottom: `1px solid ${t.border}`, background: t.bg, flexShrink: 0, flexWrap: 'wrap', transition: 'background 0.25s' }}>
             {['all', 'online', 'degraded', 'offline', 'unknown'].map(f => {
               const active = filter === f;
               return (
-                <button key={f} onClick={() => setFilter(f)} style={{ fontSize: 10, padding: '4px 9px', borderRadius: 2, border: `1px solid ${active ? t.tabActiveBg : t.tabInactBdr}`, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', transition: 'all 0.15s', background: active ? t.tabActiveBg : 'transparent', color: active ? t.tabActiveClr : t.textMuted }}>
+                <button key={f} onClick={() => setFilter(f)} style={{ fontSize: 10, padding: '3px 8px', borderRadius: 2, border: `1px solid ${active ? t.tabActiveBg : t.tabInactBdr}`, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', transition: 'all 0.15s', background: active ? t.tabActiveBg : 'transparent', color: active ? t.tabActiveClr : t.textMuted }}>
                   {f}
                 </button>
               );
             })}
           </div>
 
-          {/* List */}
+          {/* List — tighter padding on mobile so more items fit */}
           <div style={{ flex: 1, overflowY: 'auto' }}>
             {filtered.map(loc => (
               <div
                 key={loc.id}
                 onClick={() => setSelected(prev => prev === loc.id ? null : loc.id)}
-                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px', borderBottom: `1px solid ${t.borderSubtle}`, cursor: 'pointer', transition: 'background 0.1s', background: selected === loc.id ? t.listActiveBg : 'transparent' }}
+                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: isMobile ? '6px 12px' : '9px 14px', borderBottom: `1px solid ${t.borderSubtle}`, cursor: 'pointer', transition: 'background 0.1s', background: selected === loc.id ? t.listActiveBg : 'transparent' }}
               >
                 <div style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0, background: STATUS_COLOR[loc.status], boxShadow: t.dotGlow ? `0 0 5px ${STATUS_COLOR[loc.status]}99` : 'none' }} />
                 <span style={{ flex: 1, fontSize: 12, color: t.textBody, letterSpacing: '0.03em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
