@@ -247,8 +247,9 @@ export default function App() {
 
   const [isDark,     setIsDark]     = useState(() => {
     const saved = localStorage.getItem('drakeMapDarkMode');
-    return saved !== null ? saved === 'true' : true; // default dark if no preference saved
+    return saved !== null ? saved === 'true' : true;
   });
+  const [isMobile,   setIsMobile]   = useState(() => window.innerWidth < 768);
   const [selected,   setSelected]   = useState(() => {
     const saved = sessionStorage.getItem('drakeMapSelected');
     return saved ? Number(saved) : null;
@@ -267,6 +268,13 @@ export default function App() {
     style.textContent = GLOBAL_STYLES;
     document.head.appendChild(style);
     return () => document.head.removeChild(style);
+  }, []);
+
+  // Track mobile breakpoint
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
   }, []);
 
   // Persist selected device across refreshes (clears when tab closes)
@@ -384,72 +392,114 @@ export default function App() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', fontFamily: "'DM Mono', 'Courier New', monospace", background: t.bg, color: t.textPrimary, overflow: 'hidden', transition: 'background 0.25s, color 0.25s' }}>
 
-      {/* Top bar */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 20px', background: t.bg, borderBottom: `1px solid ${t.border}`, flexShrink: 0, transition: 'background 0.25s' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: '0.12em', color: t.textPrimary, textTransform: 'uppercase' }}>
-              Drake University · WiFi Monitor
+      {/* ── Top bar ── */}
+      {isMobile ? (
+        // Mobile top bar: title row + pills row
+        <div style={{ background: t.bg, borderBottom: `1px solid ${t.border}`, flexShrink: 0, padding: '8px 12px', transition: 'background 0.25s' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.1em', color: t.textPrimary, textTransform: 'uppercase' }}>
+                Drake WiFi Monitor
+              </div>
+              <div style={{ fontSize: 10, color: t.textMuted, letterSpacing: '0.07em' }}>
+                Campus Network Status
+              </div>
             </div>
-            <div style={{ fontSize: 11, color: t.textMuted, letterSpacing: '0.08em' }}>
-              Campus Network Status · Des Moines, Iowa
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ fontSize: 11, color: t.textMuted, fontVariantNumeric: 'tabular-nums' }}>{clock}</div>
+              <button
+                onClick={() => setIsDark(d => { const next = !d; localStorage.setItem('drakeMapDarkMode', String(next)); return next; })}
+                style={{ background: 'none', border: `1px solid ${t.border}`, borderRadius: 4, padding: '3px 8px', cursor: 'pointer', color: t.textMuted, fontSize: 13, fontFamily: 'inherit' }}
+              >
+                {isDark ? '☀️' : '🌙'}
+              </button>
             </div>
           </div>
           {!loading && !error && (
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {[['online', counts.online], ['degraded', counts.degraded], ['offline', counts.offline], ['unknown', counts.unknown]].map(([s, n]) => (
-                <span key={s} style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', padding: '3px 10px', borderRadius: 2, background: STATUS_COLOR[s] + '22', color: STATUS_COLOR[s], border: `1px solid ${STATUS_COLOR[s]}55`, textTransform: 'uppercase' }}>
+                <span key={s} style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', padding: '2px 8px', borderRadius: 2, background: STATUS_COLOR[s] + '22', color: STATUS_COLOR[s], border: `1px solid ${STATUS_COLOR[s]}55`, textTransform: 'uppercase' }}>
                   {n} {s}
                 </span>
               ))}
             </div>
           )}
-          {loading && <span style={{ fontSize: 11, color: t.textMuted, letterSpacing: '0.1em' }}>Loading…</span>}
-          {error   && <span style={{ fontSize: 11, color: STATUS_COLOR.offline, letterSpacing: '0.1em' }}>⚠ {error}</span>}
+          {loading && <span style={{ fontSize: 11, color: t.textMuted }}>Loading…</span>}
+          {error   && <span style={{ fontSize: 11, color: STATUS_COLOR.offline }}>⚠ {error}</span>}
         </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div style={{ fontSize: 12, color: t.textMuted, letterSpacing: '0.1em', fontVariantNumeric: 'tabular-nums' }}>{clock}</div>
-          <button
-            onClick={() => setIsDark(d => {
-              const next = !d;
-              localStorage.setItem('drakeMapDarkMode', String(next));
-              return next;
-            })}
-            style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'none', border: `1px solid ${t.border}`, borderRadius: 4, padding: '4px 10px', cursor: 'pointer', color: t.textMuted, fontSize: 11, fontFamily: 'inherit', letterSpacing: '0.08em', transition: 'all 0.2s' }}
-          >
-            <span style={{ fontSize: 14 }}>{isDark ? '☀️' : '🌙'}</span>
-            <span style={{ textTransform: 'uppercase', fontWeight: 700 }}>{isDark ? 'Light' : 'Dark'}</span>
-          </button>
+      ) : (
+        // Desktop top bar: single row
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 20px', background: t.bg, borderBottom: `1px solid ${t.border}`, flexShrink: 0, transition: 'background 0.25s' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: '0.12em', color: t.textPrimary, textTransform: 'uppercase' }}>
+                Drake University · WiFi Monitor
+              </div>
+              <div style={{ fontSize: 11, color: t.textMuted, letterSpacing: '0.08em' }}>
+                Campus Network Status · Des Moines, Iowa
+              </div>
+            </div>
+            {!loading && !error && (
+              <div style={{ display: 'flex', gap: 8 }}>
+                {[['online', counts.online], ['degraded', counts.degraded], ['offline', counts.offline], ['unknown', counts.unknown]].map(([s, n]) => (
+                  <span key={s} style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', padding: '3px 10px', borderRadius: 2, background: STATUS_COLOR[s] + '22', color: STATUS_COLOR[s], border: `1px solid ${STATUS_COLOR[s]}55`, textTransform: 'uppercase' }}>
+                    {n} {s}
+                  </span>
+                ))}
+              </div>
+            )}
+            {loading && <span style={{ fontSize: 11, color: t.textMuted, letterSpacing: '0.1em' }}>Loading…</span>}
+            {error   && <span style={{ fontSize: 11, color: STATUS_COLOR.offline, letterSpacing: '0.1em' }}>⚠ {error}</span>}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div style={{ fontSize: 12, color: t.textMuted, letterSpacing: '0.1em', fontVariantNumeric: 'tabular-nums' }}>{clock}</div>
+            <button
+              onClick={() => setIsDark(d => { const next = !d; localStorage.setItem('drakeMapDarkMode', String(next)); return next; })}
+              style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'none', border: `1px solid ${t.border}`, borderRadius: 4, padding: '4px 10px', cursor: 'pointer', color: t.textMuted, fontSize: 11, fontFamily: 'inherit', letterSpacing: '0.08em', transition: 'all 0.2s' }}
+            >
+              <span style={{ fontSize: 14 }}>{isDark ? '☀️' : '🌙'}</span>
+              <span style={{ textTransform: 'uppercase', fontWeight: 700 }}>{isDark ? 'Light' : 'Dark'}</span>
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+      {/* ── Body ── */}
+      <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', flex: 1, overflow: 'hidden' }}>
+
         {/* Map */}
-        <div style={{ flex: 1, position: 'relative' }}>
+        <div style={{ flex: 1, position: 'relative', minHeight: isMobile ? 0 : undefined }}>
           <div
             ref={mapRef}
             style={{
               width: '100%',
               height: '100%',
-              filter: isDark
-                ? 'brightness(1.8) contrast(.8)'
-                : 'contrast(1) saturate(0.95)',
+              filter: isDark ? 'brightness(1.8) contrast(.8)' : 'contrast(1) saturate(0.95)',
             }}
           />
         </div>
 
-        {/* Right panel */}
-        <div style={{ width: 260, display: 'flex', flexDirection: 'column', background: t.bgPanel, borderLeft: `1px solid ${t.border}`, overflow: 'hidden', flexShrink: 0, transition: 'background 0.25s' }}>
+        {/* ── Side/bottom panel ── */}
+        <div style={{
+          // Desktop: fixed-width right column. Mobile: fixed-height bottom drawer.
+          ...(isMobile
+            ? { width: '100%', height: selected ? '55vh' : '42vw', maxHeight: '60vh', flexDirection: 'column', borderTop: `1px solid ${t.border}`, borderLeft: 'none', transition: 'height 0.3s ease' }
+            : { width: 260, flexDirection: 'column', borderLeft: `1px solid ${t.border}` }
+          ),
+          display: 'flex',
+          background: t.bgPanel,
+          overflow: 'hidden',
+          flexShrink: 0,
+          transition: 'background 0.25s, height 0.3s ease',
+        }}>
 
           {/* Detail box */}
-          <div style={{ padding: '14px 16px', borderBottom: `1px solid ${t.border}`, flexShrink: 0, overflowY: 'auto', maxHeight: '55vh' }}>
+          <div style={{ padding: '14px 16px', borderBottom: `1px solid ${t.border}`, flexShrink: 0, overflowY: 'auto', maxHeight: isMobile ? '40vh' : '55vh' }}>
             <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.18em', color: t.textMuted, textTransform: 'uppercase', marginBottom: 10 }}>
               Location Detail
             </div>
             {selectedLoc ? (
               <>
-                {/* Device name + overall status */}
                 <div style={{ fontSize: 13, fontWeight: 700, color: t.textPrimary, marginBottom: 4, letterSpacing: '0.04em' }}>
                   {selectedLoc.name}
                 </div>
@@ -460,7 +510,6 @@ export default function App() {
                   </span>
                 </div>
 
-                {/* Staleness warning */}
                 {selectedLoc.isStale && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px', marginBottom: 10, borderRadius: 3, background: STATUS_COLOR.unknown + '18', border: `1px solid ${STATUS_COLOR.unknown}44` }}>
                     <span style={{ fontSize: 13 }}>⚠</span>
@@ -472,12 +521,9 @@ export default function App() {
                   </div>
                 )}
 
-                {/* Per-network blocks */}
                 {NETWORKS.map(({ label, pctKey, avgKey }) => {
                   const pct   = selectedLoc.avgUptime?.[pctKey] ?? null;
                   const avgMs = selectedLoc.avgPing?.[avgKey]   ?? null;
-                  const pctDisplay = pct   != null ? pct.toFixed(1)   + '%'  : '—';
-                  const avgDisplay = avgMs != null ? avgMs.toFixed(0) + ' ms' : '—';
                   return (
                     <div key={label} style={{ marginBottom: 10 }}>
                       <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.14em', color: t.textMuted, textTransform: 'uppercase', marginBottom: 4, paddingBottom: 3, borderBottom: `1px solid ${t.border}` }}>
@@ -486,20 +532,19 @@ export default function App() {
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderBottom: `1px solid ${t.borderSubtle}` }}>
                         <span style={{ fontSize: 11, color: t.textMuted, letterSpacing: '0.05em' }}>Uptime (6h)</span>
                         <span style={{ fontSize: 12, fontWeight: 700, color: valColor(pctClass(pct)) || t.textPrimary }}>
-                          {pctDisplay}
+                          {pct != null ? pct.toFixed(1) + '%' : '—'}
                         </span>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderBottom: `1px solid ${t.borderSubtle}` }}>
                         <span style={{ fontSize: 11, color: t.textMuted, letterSpacing: '0.05em' }}>Avg Ping (6h)</span>
                         <span style={{ fontSize: 12, fontWeight: 700, color: valColor(pingClass(avgMs)) || t.textPrimary }}>
-                          {avgDisplay}
+                          {avgMs != null ? avgMs.toFixed(0) + ' ms' : '—'}
                         </span>
                       </div>
                     </div>
                   );
                 })}
 
-                {/* Last report timestamp */}
                 {(() => {
                   const ts = formatTimestamp(selectedLoc.lastReportTs);
                   return (
@@ -519,7 +564,7 @@ export default function App() {
               </>
             ) : (
               <div style={{ fontSize: 12, color: t.textEmpty, lineHeight: 1.7, marginTop: 4 }}>
-                Select a marker on the map or a location in the list below.
+                {isMobile ? 'Tap a marker to see details.' : 'Select a marker on the map or a location in the list below.'}
               </div>
             )}
           </div>
