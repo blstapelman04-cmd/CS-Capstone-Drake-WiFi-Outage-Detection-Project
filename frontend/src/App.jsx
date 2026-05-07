@@ -46,7 +46,7 @@ const THEME = {
 };
 
 // Minutes of silence before a device is considered stale/offline
-const STALE_MINUTES = 15;
+const STALE_MINUTES = 30;
 // Hours of history to average uptime over
 const UPTIME_WINDOW_HOURS = 6;
 
